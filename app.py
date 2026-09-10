@@ -179,29 +179,37 @@ elif page == "Live Demo":
             **🌐 Framework:** Streamlit
             """)
 
-    @st.fragment(run_every=0.08 if st.session_state.run_camera else None)
-    def live_camera():
-        if st.session_state.run_camera:
-            cap = camera.get_camera()
-            success, frame = cap.read()
+    if st.session_state.run_camera:
+        camera_image = st.camera_input(
+            "Take a picture of your hand",
+            key="hand_camera",
+        )
 
-            if success:
-                # Keep the browser/UI responsive by processing a smaller frame.
+        if camera_image is not None:
+            try:
+                frame = camera.decode_image(camera_image.getvalue())
                 frame = camera.prepare_frame(frame)
+
                 frame_rgb, prediction, confidence, status, last_saved = (
-                    camera.process_frame(frame, st.session_state.last_saved_prediction)
+                    camera.process_frame(
+                        frame,
+                        st.session_state.last_saved_prediction,
+                    )
                 )
                 st.session_state.last_saved_prediction = last_saved
 
                 frame_placeholder.image(
-                    frame_rgb, channels="RGB", use_container_width=True
+                    frame_rgb,
+                    channels="RGB",
+                    use_container_width=True,
                 )
                 prediction_placeholder.markdown(
                     f'<div class="prediction-box">{prediction}</div>',
                     unsafe_allow_html=True,
                 )
                 confidence_placeholder.progress(
-                    min(int(confidence), 100), text=f"Confidence: {confidence:.1f}%"
+                    min(int(confidence), 100),
+                    text=f"Confidence: {confidence:.1f}%",
                 )
 
                 if status == "Hand Detected":
@@ -214,22 +222,32 @@ elif page == "Live Demo":
                         '<span class="status-offline">🔴 No Hand Detected</span>',
                         unsafe_allow_html=True,
                     )
-            else:
-                frame_placeholder.warning("Could not read from camera.")
+            except Exception as e:
+                frame_placeholder.error(f"Could not process camera image: {e}")
         else:
             frame_placeholder.info(
-                "Camera is stopped. Click **Start Camera** to begin."
+                "Allow camera access, then take a picture of your hand."
             )
             prediction_placeholder.markdown(
-                '<div class="prediction-box">--</div>', unsafe_allow_html=True
+                '<div class="prediction-box">--</div>',
+                unsafe_allow_html=True,
             )
             confidence_placeholder.progress(0, text="Confidence: 0%")
             status_placeholder.markdown(
                 '<span class="status-offline">🔴 No Hand Detected</span>',
                 unsafe_allow_html=True,
             )
-
-    live_camera()
+    else:
+        frame_placeholder.info("Camera is stopped. Click **Start Camera** to begin.")
+        prediction_placeholder.markdown(
+            '<div class="prediction-box">--</div>',
+            unsafe_allow_html=True,
+        )
+        confidence_placeholder.progress(0, text="Confidence: 0%")
+        status_placeholder.markdown(
+            '<span class="status-offline">🔴 No Hand Detected</span>',
+            unsafe_allow_html=True,
+        )
 
 # ===============================
 # ABOUT PAGE

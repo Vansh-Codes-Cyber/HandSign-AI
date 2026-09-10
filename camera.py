@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 
 # Hide TensorFlow/MediaPipe logs
@@ -45,32 +44,13 @@ def load_hands():
     return mp_hands, mp_draw, hands
 
 
-@st.cache_resource(show_spinner=False)
-def get_camera():
-    """Open the webcam once per session with a lightweight resolution.
-
-    On Windows, OpenCV's default backend (MSMF) is slow to open and adds
-    noticeable per-frame latency for most webcams, so we explicitly request
-    DirectShow (CAP_DSHOW) there. On Linux/macOS the default backend
-    (V4L2 / AVFoundation) is fine, and CAP_DSHOW doesn't exist, so we leave
-    the backend unspecified.
-    """
-    backend = cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_ANY
-    cap = cv2.VideoCapture(0, backend)
-    if not cap.isOpened():
-        raise RuntimeError(
-            "Could not open webcam (device 0). Check that a camera is "
-            "connected and not in use by another application."
-        )
-
-    # MJPG capture is much faster than the raw formats many webcams default
-    # to (e.g. YUY2), which is the other big source of lag at 640x480/30fps.
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_FPS, 30)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    return cap
+def decode_image(image_bytes):
+    """Decode a browser camera image into an OpenCV BGR frame."""
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    frame = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if frame is None:
+        raise ValueError("Could not decode the camera image.")
+    return frame
 
 
 def prepare_frame(frame):
