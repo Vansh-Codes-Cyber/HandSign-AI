@@ -157,9 +157,8 @@ elif page == "Live Demo":
     with cam_col:
         st.subheader("Live Camera")
 
-        # Browser webcam -> Streamlit Cloud server -> MediaPipe/XGBoost
-        # This provides a continuous video stream and works without
-        # trying to open cv2.VideoCapture(0) on the cloud server.
+        # Browser webcam -> WebRTC -> Streamlit Cloud -> MediaPipe/XGBoost.
+        # The STUN server is important when the app is deployed remotely.
         webrtc_ctx = camera.start_live_camera()
 
     with pred_col:
@@ -175,30 +174,46 @@ elif page == "Live Demo":
             **🌐 Framework:** Streamlit
             """)
 
-    if webrtc_ctx.state.playing:
-        st.session_state.run_camera = True
-        st.info("🟢 Camera is running — show your hand to the camera.")
-        prediction_placeholder.markdown(
-            '<div class="prediction-box">Live</div>',
-            unsafe_allow_html=True,
-        )
-        confidence_placeholder.progress(0, text="Confidence is shown on the video.")
-        status_placeholder.markdown(
-            '<span class="status-online">🟢 Live detection active</span>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.session_state.run_camera = False
-        prediction_placeholder.markdown(
-            '<div class="prediction-box">--</div>',
-            unsafe_allow_html=True,
-        )
-        confidence_placeholder.progress(0, text="Start the camera to detect")
-        status_placeholder.markdown(
-            '<span class="status-offline">🔴 Camera stopped</span>',
-            unsafe_allow_html=True,
-        )
-        st.caption("Click START above the camera and allow browser camera access.")
+    @st.fragment(run_every=0.5)
+    def update_live_result():
+        processor = webrtc_ctx.video_processor
+
+        if processor is not None and webrtc_ctx.state.playing:
+            prediction = processor.latest_prediction
+            confidence = processor.latest_confidence
+            status = processor.latest_status
+
+            prediction_placeholder.markdown(
+                f'<div class="prediction-box">{prediction}</div>',
+                unsafe_allow_html=True,
+            )
+            confidence_placeholder.progress(
+                min(int(confidence), 100),
+                text=f"Confidence: {confidence:.1f}%",
+            )
+
+            if status == "Hand Detected":
+                status_placeholder.markdown(
+                    '<span class="status-online">🟢 Hand Detected</span>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                status_placeholder.markdown(
+                    '<span class="status-offline">🔴 No Hand Detected</span>',
+                    unsafe_allow_html=True,
+                )
+        else:
+            prediction_placeholder.markdown(
+                '<div class="prediction-box">--</div>',
+                unsafe_allow_html=True,
+            )
+            confidence_placeholder.progress(0, text="Start the camera to detect")
+            status_placeholder.markdown(
+                '<span class="status-offline">🔴 Camera stopped</span>',
+                unsafe_allow_html=True,
+            )
+
+    update_live_result()
 
 # ===============================
 # ABOUT PAGE
