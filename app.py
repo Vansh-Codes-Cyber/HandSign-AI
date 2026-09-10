@@ -156,15 +156,11 @@ elif page == "Live Demo":
 
     with cam_col:
         st.subheader("Live Camera")
-        frame_placeholder = st.empty()
 
-        b1, b2 = st.columns(2)
-        with b1:
-            if st.button("▶ Start Camera", use_container_width=True, type="primary"):
-                st.session_state.run_camera = True
-        with b2:
-            if st.button("⏹ Stop Camera", use_container_width=True):
-                st.session_state.run_camera = False
+        # Browser webcam -> Streamlit Cloud server -> MediaPipe/XGBoost
+        # This provides a continuous video stream and works without
+        # trying to open cv2.VideoCapture(0) on the cloud server.
+        webrtc_ctx = camera.start_live_camera()
 
     with pred_col:
         st.subheader("Prediction")
@@ -179,75 +175,30 @@ elif page == "Live Demo":
             **🌐 Framework:** Streamlit
             """)
 
-    if st.session_state.run_camera:
-        camera_image = st.camera_input(
-            "Take a picture of your hand",
-            key="hand_camera",
+    if webrtc_ctx.state.playing:
+        st.session_state.run_camera = True
+        st.info("🟢 Camera is running — show your hand to the camera.")
+        prediction_placeholder.markdown(
+            '<div class="prediction-box">Live</div>',
+            unsafe_allow_html=True,
         )
-
-        if camera_image is not None:
-            try:
-                frame = camera.decode_image(camera_image.getvalue())
-                frame = camera.prepare_frame(frame)
-
-                frame_rgb, prediction, confidence, status, last_saved = (
-                    camera.process_frame(
-                        frame,
-                        st.session_state.last_saved_prediction,
-                    )
-                )
-                st.session_state.last_saved_prediction = last_saved
-
-                frame_placeholder.image(
-                    frame_rgb,
-                    channels="RGB",
-                    use_container_width=True,
-                )
-                prediction_placeholder.markdown(
-                    f'<div class="prediction-box">{prediction}</div>',
-                    unsafe_allow_html=True,
-                )
-                confidence_placeholder.progress(
-                    min(int(confidence), 100),
-                    text=f"Confidence: {confidence:.1f}%",
-                )
-
-                if status == "Hand Detected":
-                    status_placeholder.markdown(
-                        '<span class="status-online">🟢 Hand Detected</span>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    status_placeholder.markdown(
-                        '<span class="status-offline">🔴 No Hand Detected</span>',
-                        unsafe_allow_html=True,
-                    )
-            except Exception as e:
-                frame_placeholder.error(f"Could not process camera image: {e}")
-        else:
-            frame_placeholder.info(
-                "Allow camera access, then take a picture of your hand."
-            )
-            prediction_placeholder.markdown(
-                '<div class="prediction-box">--</div>',
-                unsafe_allow_html=True,
-            )
-            confidence_placeholder.progress(0, text="Confidence: 0%")
-            status_placeholder.markdown(
-                '<span class="status-offline">🔴 No Hand Detected</span>',
-                unsafe_allow_html=True,
-            )
+        confidence_placeholder.progress(0, text="Confidence is shown on the video.")
+        status_placeholder.markdown(
+            '<span class="status-online">🟢 Live detection active</span>',
+            unsafe_allow_html=True,
+        )
     else:
-        frame_placeholder.info("Camera is stopped. Click **Start Camera** to begin.")
+        st.session_state.run_camera = False
         prediction_placeholder.markdown(
             '<div class="prediction-box">--</div>',
             unsafe_allow_html=True,
         )
-        confidence_placeholder.progress(0, text="Confidence: 0%")
+        confidence_placeholder.progress(0, text="Start the camera to detect")
         status_placeholder.markdown(
-            '<span class="status-offline">🔴 No Hand Detected</span>',
+            '<span class="status-offline">🔴 Camera stopped</span>',
             unsafe_allow_html=True,
         )
+        st.caption("Click START above the camera and allow browser camera access.")
 
 # ===============================
 # ABOUT PAGE

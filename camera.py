@@ -5,11 +5,13 @@ from pathlib import Path
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["GLOG_minloglevel"] = "2"
 
+import av
 import cv2
 import joblib
 import mediapipe as mp
 import numpy as np
 import streamlit as st
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
 # Resolve paths relative to this file, not the process's working directory,
 # so the app works no matter where `streamlit run` is invoked from.
@@ -121,3 +123,35 @@ def process_frame(frame, last_saved_prediction):
 
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     return frame_rgb, prediction, confidence, status, last_saved_prediction
+
+
+class LiveVideoProcessor(VideoProcessorBase):
+    """Process continuous browser webcam frames on Streamlit Cloud."""
+
+    def __init__(self):
+        self.last_saved_prediction = None
+
+    def recv(self, frame):
+        image = frame.to_ndarray(format="bgr24")
+        image = prepare_frame(image)
+
+        frame_rgb, prediction, confidence, status, last_saved = process_frame(
+            image,
+            self.last_saved_prediction,
+        )
+        self.last_saved_prediction = last_saved
+
+        return av.VideoFrame.from_ndarray(frame_rgb, format="rgb24")
+
+
+def start_live_camera():
+    """Start a browser webcam stream using WebRTC."""
+    return webrtc_streamer(
+        key="handsign-live-camera",
+        video_processor_factory=LiveVideoProcessor,
+        media_stream_constraints={
+            "video": True,
+            "audio": False,
+        },
+        async_processing=True,
+    )
