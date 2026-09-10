@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Project-generated data (recreate with the scripts in scripts/)
+dataset/
+screenshots/
+
+# Runtime log (keep the folder, ignore its generated content)
+output/recognized_signs.txt
+
+# OS / editor cruft
+.DS_Store
+.vscode/
+.idea/
